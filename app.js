@@ -10,6 +10,20 @@ function clientHandlerReady(client) {
     console.log(`Logged in as ${client.user.tag}!, I should be online now`);
 }
 
+function sendRandomQuote(channel) {
+    channel.send(getRandomLine());
+}
+
+function displayHelp(channel) {
+    const embed = new Discord.MessageEmbed()
+    .setTitle('Bolsonaro command list:')
+    .setColor(0xFCAA00)
+    .setDescription('Use b. para falar comigo')
+    .addField('Quote', 'Mando uma elocução do passado', true)
+    .addField('Help', 'Mostro essa mensagem', false);
+    channel.send('Brasil acima de tudo, Deus acima de todos.', embed);
+}
+
 /** @param {import("discord.js").Message} msg */
 function clientHandlerMesssage(msg) {
     lowerCaseMessage = msg.content.toLowerCase();
@@ -17,19 +31,12 @@ function clientHandlerMesssage(msg) {
     if (lowerCaseMessage.startsWith('b.', 0) == true) {
         // b.Help function
         if (lowerCaseMessage.search('help') != -1) {
-            const embed = new Discord.MessageEmbed()
-            .setTitle('Bolsonaro command list:')
-            .setColor(0xFCAA00)
-            // .setThumbnail('https://i.imgur.com/lCZ1lnx.jpg')
-            .setDescription('Use b. para falar comigo')
-            .addField('Quote', 'Mando uma elocução do passado', true)
-            .addField('Help', 'Mostro essa mensagem', false);
-            msg.channel.send('Brasil acima de tudo, Deus acima de todos.', embed);
+            displayHelp(msg.channel);
         }
         else
         // b.Quote function
         if (lowerCaseMessage.search('quote') != -1) {
-            msg.channel.send(getRandomLine())
+            sendRandomQuote(msg.channel);
         }
     }
     // only respond to non bot messages
