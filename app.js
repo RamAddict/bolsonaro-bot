@@ -17,7 +17,7 @@ function sendRandomQuote(channel) {
     channel.send(getRandomLine());
 }
 
-function sendRandomPolThread(channel) {
+async function sendRandomPolThread(channel) {
     let result = 0;
     const catalog = await axios.get('https://a.4cdn.org/pol/catalog.json');
     if (chanThreadCache.length != 0) {
@@ -30,7 +30,8 @@ function sendRandomPolThread(channel) {
 
     // Parse text part of post
     const opText = striptags(result.data.posts[0].com) || '[No text]';
-            
+    opText = decodeURI(opText)
+
     // Parse image part of post
     const opImage = result.data.posts[0].tim;
     const opImageExt = result.data.posts[0].ext;
@@ -43,7 +44,7 @@ function sendRandomPolThread(channel) {
     .setTitle(await opTitle)
     .setImage('https://i.4cdn.org/pol/' + await opImage + opImageExt)
     .setDescription(await opText);
-    msg.channel.send(embed);
+    channel.send(embed);
 
     // Fill chanThreadCache
     if (chanThreadCache.length == 0)
@@ -79,7 +80,7 @@ async function clientHandlerMesssage(msg) {
         else
         // b.pol
         if (lowerCaseMessage.search('pol') != -1) {
-            sendRandomPolThread(channel);
+            sendRandomPolThread(msg.channel);
         }
     }
     // only respond to non bot messages
