@@ -1,5 +1,8 @@
-const bolsonaroQuotes = require("./bolsonaro.quotes.json")
+const bolsonaroQuotes = require("./bolsonaro.quotes.json");
 const Discord = require('discord.js');
+const axios = require('axios').default;
+let striptags = require('striptags');
+var chanThreadCache = []; // pol4chan thread cache
 
 function getRandomLine() {
     const filesize = 25;
@@ -14,6 +17,41 @@ function sendRandomQuote(channel) {
     channel.send(getRandomLine());
 }
 
+function sendRandomPolThread(channel) {
+    let result = 0;
+    const catalog = await axios.get('https://a.4cdn.org/pol/catalog.json');
+    if (chanThreadCache.length != 0) {
+        result = chanThreadCache.pop();
+    } else {
+        /** @type  { {body: {threads : Array<Object>} } } */
+        const threadNo = catalog.data[parseInt(Math.random()*6)].threads[2].no;
+        result = await axios.get('https://a.4cdn.org/pol/thread/' + threadNo + '.json');
+    }
+
+    // Parse text part of post
+    const opText = striptags(result.data.posts[0].com) || '[No text]';
+            
+    // Parse image part of post
+    const opImage = result.data.posts[0].tim;
+    const opImageExt = result.data.posts[0].ext;
+
+    // Parse title part of post
+    const opTitle = result.data.posts[0].sub || '[No Title]';
+
+    // Send embed
+    const embed = new Discord.MessageEmbed()
+    .setTitle(await opTitle)
+    .setImage('https://i.4cdn.org/pol/' + await opImage + opImageExt)
+    .setDescription(await opText);
+    msg.channel.send(embed);
+
+    // Fill chanThreadCache
+    if (chanThreadCache.length == 0)
+    chanThreadCache = [await axios.get('https://a.4cdn.org/pol/thread/' + catalog.data[0].threads[3 + parseInt(Math.random()*4)].no + '.json'),
+            await axios.get('https://a.4cdn.org/pol/thread/' + catalog.data[0].threads[8 + parseInt(Math.random()*4)].no + '.json'),
+            await axios.get('https://a.4cdn.org/pol/thread/' + catalog.data[0].threads[12 + parseInt(Math.random()*4)].no + '.json')];
+}
+
 function displayHelp(channel) {
     const embed = new Discord.MessageEmbed()
     .setTitle('Bolsonaro command list:')
@@ -25,7 +63,7 @@ function displayHelp(channel) {
 }
 
 /** @param {import("discord.js").Message} msg */
-function clientHandlerMesssage(msg) {
+async function clientHandlerMesssage(msg) {
     lowerCaseMessage = msg.content.toLowerCase();
     // for now invocation line is b.
     if (lowerCaseMessage.startsWith('b.', 0) == true) {
@@ -37,6 +75,11 @@ function clientHandlerMesssage(msg) {
         // b.Quote function
         if (lowerCaseMessage.search('quote') != -1) {
             sendRandomQuote(msg.channel);
+        }
+        else
+        // b.pol
+        if (lowerCaseMessage.search('pol') != -1) {
+            sendRandomPolThread(channel);
         }
     }
     // only respond to non bot messages
