@@ -29,7 +29,7 @@ async function sendRandomPolThread(channel) {
     }
 
     // Parse text part of post
-    const opText = striptags(result.data.posts[0].com) || '[No text]';
+    let opText = striptags(result.data.posts[0].com) || '[No text]';
     opText = decodeURI(opText)
 
     // Parse image part of post
