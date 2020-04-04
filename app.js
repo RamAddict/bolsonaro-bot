@@ -20,11 +20,11 @@ function sendRandomQuote(channel) {
 async function sendRandomPolThread(channel) {
     let result = 0;
     const catalog = await axios.get('https://a.4cdn.org/pol/catalog.json');
+    const threadNo = catalog.data[parseInt(Math.random()*8)].threads[2].no;
     if (chanThreadCache.length != 0) {
         result = chanThreadCache.pop();
     } else {
         /** @type  { {body: {threads : Array<Object>} } } */
-        const threadNo = catalog.data[parseInt(Math.random()*6)].threads[2].no;
         result = await axios.get('https://a.4cdn.org/pol/thread/' + threadNo + '.json');
     }
 
@@ -39,10 +39,12 @@ async function sendRandomPolThread(channel) {
     // Parse title part of post
     const opTitle = result.data.posts[0].sub || '[No Title]';
 
+    const footerLink = 'https://boards.4chan.org/pol/thread/' + threadNo;
     // Send embed
     const embed = new Discord.MessageEmbed()
     .setTitle(await opTitle)
     .setImage('https://i.4cdn.org/pol/' + await opImage + opImageExt)
+    .setFooter(footerLink)
     .setDescription(await opText);
     channel.send(embed);
 
