@@ -17,20 +17,59 @@ function sendRandomQuote(channel) {
     channel.send(getRandomLine());
 }
 
-async function sendRandomPolThread(channel) {
-    let result = 0;
-    const catalog = await axios.get('https://a.4cdn.org/pol/catalog.json');
-    const threadNo = catalog.data[parseInt(Math.random()*8)].threads[2].no;
-    if (chanThreadCache.length != 0) {
-        result = chanThreadCache.pop();
-    } else {
-        /** @type  { {body: {threads : Array<Object>} } } */
-        result = await axios.get('https://a.4cdn.org/pol/thread/' + threadNo + '.json');
+async function sendRandom4ChanThread(channel, board) {
+    switch (board)
+    {
+        case 'b':
+        case 'pol':
+        case 'r9k':
+        case 'bant':
+        case 'soc':
+        case 's4s':
+        case 's':
+        case 'hc':
+        case 'hm':
+        case 'h':
+        case 'e':
+        case 'u':
+        case 'y':
+        case 'd':
+        case 't':
+        case 'hr':
+        case 'gif':
+        case 'aco':
+        case 'r':
+            msg = board + "is NSFW, you naughty";
+            channel.setNSFW(true, msg);
     }
+    let result = 0;
+    let catalog = 0;
+    try {
+        catalog = await ( axios.get('https://a.4cdn.org/' + board + '/catalog.json'));
+    } catch (err) {
+        if (err.response.status == 404)
+        {
+            await channel.send('No such board "' + board + '"');
+            return;
+        }
+    }
+    const threadNo = await catalog.data[parseInt(Math.random()*8)].threads[2].no;
+    // if (chanThreadCache.length != 0) {
+    //     result = chanThreadCache.pop();
+    // } else {
+        /** @type  { {body: {threads : Array<Object>} } } */
+        result = await axios.get('https://a.4cdn.org/'+ board +'/thread/' + threadNo + '.json');
+    // }
 
     // Parse text part of post
     let opText = striptags(result.data.posts[0].com) || '[No text]';
-    opText = decodeURI(opText)
+    try {
+        opText = decodeURI(opText)
+    } catch (malFormedUri) {
+        opText = striptags(result.data.posts[0].com) || '[No text]';
+        if (URIError == malFormedUri)
+            console.log("MalFormedUri")
+    }
 
     // Parse image part of post
     const opImage = result.data.posts[0].tim;
@@ -39,30 +78,50 @@ async function sendRandomPolThread(channel) {
     // Parse title part of post
     const opTitle = result.data.posts[0].sub || '[No Title]';
 
-    const footerLink = 'https://boards.4chan.org/pol/thread/' + threadNo;
+    // Create footerLink and Embed URL
+    const footerLink = 'https://boards.4chan.org/' + board + '/thread/' + threadNo;
+    
     // Send embed
     const embed = new Discord.MessageEmbed()
-    .setTitle(await opTitle)
-    .setImage('https://i.4cdn.org/pol/' + await opImage + opImageExt)
+    .setTitle(opTitle)
+    .setURL('https://boards.4chan.org/' + board + '/thread/' + threadNo)
+    .setColor('RANDOM')
+    .setImage('https://i.4cdn.org/' + board + '/' + opImage + opImageExt)
     .setFooter(footerLink)
-    .setDescription(await opText);
+    .setDescription(opText);
     channel.send(embed);
-
+    console.log(embed.toJSON());
+    
     // Fill chanThreadCache
-    if (chanThreadCache.length == 0)
-    chanThreadCache = [await axios.get('https://a.4cdn.org/pol/thread/' + catalog.data[0].threads[3 + parseInt(Math.random()*4)].no + '.json'),
-            await axios.get('https://a.4cdn.org/pol/thread/' + catalog.data[0].threads[8 + parseInt(Math.random()*4)].no + '.json'),
-            await axios.get('https://a.4cdn.org/pol/thread/' + catalog.data[0].threads[12 + parseInt(Math.random()*4)].no + '.json')];
+    // if (chanThreadCache.length == 0)
+    // chanThreadCache = [await axios.get('https://a.4cdn.org/' + board + '/thread/' + catalog.data[0].threads[3 + parseInt(Math.random()*4)].no + '.json'),
+    //         await axios.get('https://a.4cdn.org/' + board + '/thread/' + catalog.data[0].threads[8 + parseInt(Math.random()*4)].no + '.json')];
 }
 
-function displayHelp(channel) {
-    const embed = new Discord.MessageEmbed()
-    .setTitle('Bolsonaro command list:')
-    .setColor(0xFCAA00)
-    .setDescription('Use b. para falar comigo')
-    .addField('Quote', 'Mando uma elocução do passado', true)
-    .addField('Help', 'Mostro essa mensagem', false);
-    channel.send('Brasil acima de tudo, Deus acima de todos.', embed);
+function displayHelp(channel, language) {
+    if (language === 'pt')
+    {
+        const embed = new Discord.MessageEmbed()
+        .setTitle('Lista de comandos:')
+        .setColor(0xFCAA00)
+        .setDescription('`Use b. para falar comigo`')
+        .addField('`Quote`', 'Mando uma elocução do passado', true)
+        .addField('`Chan [board]`', 'Mando uma thread do [board] do 4chan, ex: "b.chan lit"', false)
+        .addField('`Help`', 'Mostro essa mensagem', false)
+        .setFooter('type "b.helpu" for english version');
+        channel.send('Brasil acima de tudo, Deus acima de todos.', embed);
+    }
+    else
+    {
+        const embed = new Discord.MessageEmbed()
+        .setTitle('Bolsonaro command list:')
+        .setColor(0xFCAA00)
+        .setDescription('Use b. to ')
+        .addField('`Quote`', 'I\'ll send a famous quote of mine', true)
+        .addField('`Chan [board]`', 'Send a 4chan board [board], ex: "b.chan lit"', false)
+        .addField('`Help`', 'Show this message', false);
+        channel.send('Brasil acima de tudo, Deus acima de todos.', embed);
+    }
 }
 
 /** @param {import("discord.js").Message} msg */
@@ -72,7 +131,12 @@ async function clientHandlerMesssage(msg) {
     if (lowerCaseMessage.startsWith('b.', 0) == true) {
         // b.Help function
         if (lowerCaseMessage.search('help') != -1) {
-            displayHelp(msg.channel);
+            displayHelp(msg.channel, 'pt');
+        }
+        else
+        //b.Helpu (en)
+        if (lowerCaseMessage.search('helpu') != -1) {
+            displayHelp(msg.channel, 'en');
         }
         else
         // b.Quote function
@@ -80,9 +144,9 @@ async function clientHandlerMesssage(msg) {
             sendRandomQuote(msg.channel);
         }
         else
-        // b.pol
-        if (lowerCaseMessage.search('pol') != -1) {
-            sendRandomPolThread(msg.channel);
+        // b.chan <board>
+        if (lowerCaseMessage.search('chan') != -1) {
+            sendRandom4ChanThread(msg.channel, lowerCaseMessage.split(' ', 2)[1]);
         }
     }
     // only respond to non bot messages
