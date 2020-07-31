@@ -150,17 +150,7 @@ async function clientHandlerMesssage(msg) {
         }
     }
     // only respond to non bot messages
-    if (!msg.author.bot) {
-        //   random text replies section EASTEREGGS
-        if (lowerCaseMessage.search('adriano') != -1) {
-            msg.reply('Adriano é viado eim')
-        }
-        if (lowerCaseMessage.search('joao') != -1) {
-            msg.reply('joao é corno')
-        }
-        if (lowerCaseMessage.search('web dev') != -1 || lowerCaseMessage.search('webedeve') != -1) {
-            msg.reply('Web dev nem gente é')
-        }
+
     }
 }
 
