@@ -1,6 +1,9 @@
 const bolsonaroQuotes = require("./bolsonaro.quotes.json");
 const Discord = require('discord.js');
 const axios = require('axios').default;
+const fs = require('fs');
+const ytdl = require('ytdl-core-discord');
+const ytsr = require('ytsr');
 let striptags = require('striptags');
 var chanThreadCache = []; // pol4chan thread cache
 
@@ -90,7 +93,7 @@ async function sendRandom4ChanThread(channel, board) {
     .setFooter(footerLink)
     .setDescription(opText);
     channel.send(embed);
-    console.log(embed.toJSON());
+    // console.log(embed.toJSON());
     
     // Fill chanThreadCache
     // if (chanThreadCache.length == 0)
@@ -126,6 +129,9 @@ function displayHelp(channel, language) {
 
 /** @param {import("discord.js").Message} msg */
 async function clientHandlerMesssage(msg) {
+    ultimoCanalInteragido = msg.channel.id;
+
+
     lowerCaseMessage = msg.content.toLowerCase();
     // for now invocation line is b.
     if (lowerCaseMessage.startsWith('b.', 0) == true) {
@@ -148,18 +154,161 @@ async function clientHandlerMesssage(msg) {
         if (lowerCaseMessage.search('chan') != -1) {
             sendRandom4ChanThread(msg.channel, lowerCaseMessage.split(' ', 2)[1]);
         }
+        else
+        if (lowerCaseMessage.search('play') != -1) {
+           await playVideoYt(msg, msg.content.split(' ').slice(1).join(" "));
+        }
+        else
+        if (lowerCaseMessage.search('stop') != -1) {
+            stopVideoYt(msg);
+        }
     }
     // only respond to non bot messages
 
+    }
+
+/**
+ * @param {import("discord.js").Message} msg
+ */
+function stopVideoYt(msg) {
+    const connection = msg.client.voice.connections
+    .find((c) => {
+        return c.channel.id === msg.member.voice.channel.id
+    });
+    if (connection) {
+        connection.emit("videoStop")    ;
+    }
+}
+
+/**
+ * @param {import("discord.js").Message} msg
+ */
+async function playVideoYt(msg, song) {
+    const channel = msg.member.voice.channel;
+    if (channel) {
+        // Login voice channel
+        // Start Streaming to Channel
+        try {
+            // Try to find or create connection
+            const connection = msg.client.voice.connections
+                .find((c) => {
+                    c.channel.id === channel.id
+                })
+                || await channel.join();
+                console.log(song)
+            // const searchResults = await ytsr(null, options);
+            // Try fetch url data
+            let uri = song;
+            try {
+                new URL(uri);
+            } catch(e) {
+                const filterFinder = await ytsr.getFilters(song);
+                const filter1 = filterFinder.get('Type').find(o => o.name === 'Video');
+                const search = await ytsr(uri, {nextpageRef: filter1.ref, limit: 10});
+                uri = search.items.find(i => i.type === "video").link
+                console.log(uri)
+                
+            }
+            const urlParams = new URL(uri).searchParams;
+            const videoBegin = Number(urlParams.get("t") || 0);
+            console.log(videoBegin);
+
+            const info = await ytdl.getInfo(uri);
+            const embed = new Discord.MessageEmbed();
+            embed.setTitle("Now Playing").setImage(info.videoDetails.thumbnail.thumbnails[0].url)
+            .setDescription(`[${info.videoDetails.title}](${info.videoDetails.video_url})`);
+            const sentEmbed = await msg.channel.send(embed);
+            const deleteEmbed = () => sentEmbed.delete();
+            // const format = ytdl.chooseFormat(info.formats, {
+            //     filter: "audioonly"
+            // });
+            // const byteStart = Number.parseInt(Math.floor((format.audioBitrate * 1000 * videoBegin) / 8));
+            // const byteEnd = Number.parseInt(format.contentLength);
+            // console.log(format.audioBitrate)
+            // console.log(byteStart)
+            // console.log(byteEnd)
+            // connection.dispatcher.end();
+
+            const audio = await ytdl(uri, {
+                begin: videoBegin
+            })
+            const dispatcher = connection.play(audio, { type: 'opus'}); // Toca a fita
+            
+
+            audio.on("close", deleteEmbed);
+            dispatcher.on('error', console.error);
+            connection.on("videoStop", async () => {
+                await deleteEmbed();
+                dispatcher.destroy();
+            })
+
+            // dispatcher.destroy();
+        } catch (error) {
+            console.error(error);
+        }
+    } else {
+        msg.channel.send("Entra num serveró ai, va-ga-bun-do.")
     }
 }
 
 function initializeBot() {
     const client = new Discord.Client();
     client.on('ready', () => clientHandlerReady(client));
-    client.on('message', clientHandlerMesssage);
-    client.login('Njk0NjYzNjk1MDg2NjQ5MzY2.XoQBUw.Oxk-eWFIp0hTUnXYX59SnjRPbJw');
+    client.on('message', async (...args) => {
+        try {
+            await clientHandlerMesssage(...args)
+        } catch(error) {
+            console.error(error);
+        }
+    });
+    client.login('Njk0NjYzNjk1MDg2NjQ5MzY2.XoO5-w.OQ5BmfgHdFRJXYwk9dQuRc_weSs');
+    registerExitHandler(async () => {
+
+
+    //   const ch = client.channels.cache.get(ultimoCanalInteragido);
+        // const embed = new Discord.MessageEmbed();
+        // embed.setTitle("Morri ...").setImage("https://static.poder360.com.br/2018/09/bolsonaroesfaqueado2-1-1-868x644.jpeg");
+        // await ch.send(embed);
+        process.exit(0);
+    });
+    
 }
+
 
 // Begin Listen
 initializeBot()
+
+var ultimoCanalInteragido = null;
+function registerExitHandler(exitHandler) {
+    [
+        'beforeExit',
+        'SIGHUP', 'SIGINT', 'SIGQUIT', 'SIGILL', 'SIGTRAP', 
+        'SIGABRT','SIGBUS', 'SIGFPE', 'SIGUSR1', 'SIGSEGV', 
+        'SIGUSR2', 'SIGTERM', 
+    ].forEach(evt => process.on(evt, exitHandler));
+}
+
+// // Antes de 2015
+// //... codigo
+// funcaoAssincrona(parametro, function (err, res) {
+//     funcaoAssincrona2(p, function(err1, res1) {
+//         // Callback hell
+//     })
+// })
+// //... codigo
+// const prom = funcaoAssincrona(parametro)
+// prom
+//     .then()
+//     .then()
+//     .then()
+// // ES7
+// // Aqui Fora, tudo oq está dentro de funcaoAssincrona é visto 
+// // como a propria função funcaoAssincrona rodando de maneira assincrona
+// funcaoAssincrona = async () => {
+//     // Sincronizar o código aqui dentro
+//     const ap = f1();
+//     const bp = f2();
+//     const cp = f3();
+//     const [a,b,c] = await Promise.all([ap, bp, cp])
+// }
+// funcaoAssincrona();
