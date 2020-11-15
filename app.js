@@ -4,6 +4,7 @@ const axios = require('axios').default;
 const fs = require('fs');
 const ytdl = require('ytdl-core-discord');
 const ytsr = require('ytsr');
+require('dotenv/config');
 let striptags = require('striptags');
 var chanThreadCache = []; // pol4chan thread cache
 
@@ -261,9 +262,8 @@ function initializeBot() {
             console.error(error);
         }
     });
-    client.login('Njk0NjYzNjk1MDg2NjQ5MzY2.XoO5-w.OQ5BmfgHdFRJXYwk9dQuRc_weSs');
+    client.login(process.env.BOT_TOKEN);
     registerExitHandler(async () => {
-
 
     //   const ch = client.channels.cache.get(ultimoCanalInteragido);
         // const embed = new Discord.MessageEmbed();
