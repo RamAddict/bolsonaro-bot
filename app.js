@@ -4,6 +4,10 @@ const axios = require('axios').default;
 const fs = require('fs');
 const ytdl = require('ytdl-core-discord');
 const ytsr = require('ytsr');
+const btdl = require('bitchute-dl');
+const prism = require("prism-media");
+const ffmpeg = require("fluent-ffmpeg");
+const path = require("path");
 require('dotenv/config');
 let striptags = require('striptags');
 var chanThreadCache = []; // pol4chan thread cache
@@ -18,7 +22,7 @@ function clientHandlerReady(client) {
 }
 
 function sendRandomQuote(channel) {
-    channel.send(getRandomLine());
+    channel.send(getRandomLine(), {tts: true});
 }
 
 async function sendRandom4ChanThread(channel, board) {
@@ -111,6 +115,7 @@ function displayHelp(channel, language) {
         .setDescription('`Use b. para falar comigo`')
         .addField('`Quote`', 'Mando uma elocução do passado', true)
         .addField('`Chan [board]`', 'Mando uma thread do [board] do 4chan, ex: "b.chan lit"', false)
+        .addField('`play [nome do vídeo ou url]`', 'Toco um vídeo do Youtube a partir de url ou nome. Se for url do Bitchute, também funciona.', false)
         .addField('`Help`', 'Mostro essa mensagem', false)
         .setFooter('type "b.helpu" for english version');
         channel.send('Brasil acima de tudo, Deus acima de todos.', embed);
@@ -123,7 +128,9 @@ function displayHelp(channel, language) {
         .setDescription('Use b. to ')
         .addField('`Quote`', 'I\'ll send a famous quote of mine', true)
         .addField('`Chan [board]`', 'Send a 4chan board [board], ex: "b.chan lit"', false)
-        .addField('`Help`', 'Show this message', false);
+        .addField('`play [video name or url]`', 'Play a video from youtube using its name or link. Will also work with Bitchute links.', true)
+        .addField('`Help`', 'Show this message', false)
+        .setFooter('digite "b.help" para a versão em português');
         channel.send('Brasil acima de tudo, Deus acima de todos.', embed);
     }
 }
@@ -136,14 +143,14 @@ async function clientHandlerMesssage(msg) {
     lowerCaseMessage = msg.content.toLowerCase();
     // for now invocation line is b.
     if (lowerCaseMessage.startsWith('b.', 0) == true) {
-        // b.Help function
-        if (lowerCaseMessage.search('help') != -1) {
-            displayHelp(msg.channel, 'pt');
-        }
-        else
         //b.Helpu (en)
         if (lowerCaseMessage.search('helpu') != -1) {
             displayHelp(msg.channel, 'en');
+        }
+        else
+        // b.Help function
+        if (lowerCaseMessage.search('help') != -1) {
+            displayHelp(msg.channel, 'pt');
         }
         else
         // b.Quote function
@@ -157,11 +164,11 @@ async function clientHandlerMesssage(msg) {
         }
         else
         if (lowerCaseMessage.search('play') != -1) {
-           await playVideoYt(msg, msg.content.split(' ').slice(1).join(" "));
+           await playVideo(msg, msg.content.split(' ').slice(1).join(" "));
         }
         else
         if (lowerCaseMessage.search('stop') != -1) {
-            stopVideoYt(msg);
+            stopVideo(msg);
         }
     }
     // only respond to non bot messages
@@ -171,7 +178,7 @@ async function clientHandlerMesssage(msg) {
 /**
  * @param {import("discord.js").Message} msg
  */
-function stopVideoYt(msg) {
+function stopVideo(msg) {
     const connection = msg.client.voice.connections
     .find((c) => {
         return c.channel.id === msg.member.voice.channel.id
@@ -183,8 +190,9 @@ function stopVideoYt(msg) {
 
 /**
  * @param {import("discord.js").Message} msg
+ * @param {string} song
  */
-async function playVideoYt(msg, song) {
+async function playVideo(msg, song) {
     const channel = msg.member.voice.channel;
     if (channel) {
         // Login voice channel
@@ -196,51 +204,73 @@ async function playVideoYt(msg, song) {
                     c.channel.id === channel.id
                 })
                 || await channel.join();
+                connection.client.clearTimeout();
+                // connection.setSpeaking(Discord.Speaking.FLAGS.SOUNDSHARE);
+                
                 console.log(song)
             // const searchResults = await ytsr(null, options);
             // Try fetch url data
             let uri = song;
-            try {
-                new URL(uri);
-            } catch(e) {
-                const filterFinder = await ytsr.getFilters(song);
-                const filter1 = filterFinder.get('Type').find(o => o.name === 'Video');
-                const search = await ytsr(uri, {nextpageRef: filter1.ref, limit: 10});
-                uri = search.items.find(i => i.type === "video").link
-                console.log(uri)
-                
-            }
-            const urlParams = new URL(uri).searchParams;
-            const videoBegin = Number(urlParams.get("t") || 0);
-            console.log(videoBegin);
-
-            const info = await ytdl.getInfo(uri);
+            let stream;
             const embed = new Discord.MessageEmbed();
-            embed.setTitle("Now Playing").setImage(info.videoDetails.thumbnail.thumbnails[0].url)
-            .setDescription(`[${info.videoDetails.title}](${info.videoDetails.video_url})`);
+
+            if (btdl.isBitchuteLink(uri))
+            {
+                const cookies = btdl.fetchCookies();
+                const vpath = uri.replace("https://www.bitchute.com/", "");
+                const privateLink = await btdl.getVideoPrivateLink(vpath, cookies);
+                embed.setTitle("Now Playing")
+                .setDescription(`[Access Video on Bitchute](${privateLink})`);
+                // Pipe Video
+                const transcoder = new prism.FFmpeg({args: [
+                    "-i", privateLink,
+                    '-analyzeduration', '0',
+                    '-loglevel', '0',
+                    '-f', 's16le',
+                    '-ar', '48000',
+                    '-ac', '2',
+                ]})
+                const opus = new prism.opus.Encoder({rate: 48000, channels: 2, frameSize: 960});
+                stream = transcoder.pipe(opus);
+            }
+            else {
+                try {
+                    new URL(uri);
+                } catch(e) {
+                    const filterFinder = await ytsr.getFilters(song);
+                    const filter1 = filterFinder.get('Type').find(o => o.name === 'Video');
+                    const search = await ytsr(uri, {nextpageRef: filter1.ref, limit: 10});
+                    uri = search.items.find(i => i.type === "video").link
+                    console.log(uri)
+                    
+                }
+                const urlParams = new URL(uri).searchParams;
+                const videoBegin = Number(urlParams.get("t") || 0);
+                // console.log(videoBegin);
+                let info = null;
+                while (!info) {
+                    info = await ytdl.getInfo(uri);
+                }
+                // console.log(info);
+                embed.setTitle("Now Playing").setImage(info.videoDetails.thumbnail.thumbnails[0].url)
+                .setDescription(`[${info.videoDetails.title}](${info.videoDetails.video_url})`);
+                
+
+                stream = await ytdl(uri, {
+                    begin: videoBegin
+                })
+            }
+
             const sentEmbed = await msg.channel.send(embed);
-            const deleteEmbed = () => sentEmbed.delete();
-            // const format = ytdl.chooseFormat(info.formats, {
-            //     filter: "audioonly"
-            // });
-            // const byteStart = Number.parseInt(Math.floor((format.audioBitrate * 1000 * videoBegin) / 8));
-            // const byteEnd = Number.parseInt(format.contentLength);
-            // console.log(format.audioBitrate)
-            // console.log(byteStart)
-            // console.log(byteEnd)
-            // connection.dispatcher.end();
-
-            const audio = await ytdl(uri, {
-                begin: videoBegin
-            })
-            const dispatcher = connection.play(audio, { type: 'opus'}); // Toca a fita
+            const dispatcher = connection.play(stream, { type: 'opus'}); // Toca a fita
             
-
-            audio.on("close", deleteEmbed);
+            const deleteEmbed = () => sentEmbed.delete();
+            stream.on("close", deleteEmbed);
             dispatcher.on('error', console.error);
             connection.on("videoStop", async () => {
                 await deleteEmbed();
                 dispatcher.destroy();
+                connection.client.setTimeout(connection.disconnect(), 300000);
             })
 
             // dispatcher.destroy();
@@ -252,7 +282,7 @@ async function playVideoYt(msg, song) {
     }
 }
 
-function initializeBot() {
+async function initializeBot() {
     const client = new Discord.Client();
     client.on('ready', () => clientHandlerReady(client));
     client.on('message', async (...args) => {
@@ -271,7 +301,11 @@ function initializeBot() {
         // await ch.send(embed);
         process.exit(0);
     });
-    
+    // const tweets = await new TimelineStream("jairbolsonaro", { retweets: true, replies: true, count: 2 });
+    // tweets.on("data", (...args) => {
+    //     console.log(...args)
+    // })
+    // console.log(Object.keys(tweets));
 }
 
 
