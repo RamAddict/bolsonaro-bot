@@ -1,0 +1,35 @@
+{
+    "name": "bolsonaro-bot",
+    "version": "0.0.1",
+    "description": "",
+    "type": "module",
+    "main": "build/index.js",
+    "license": "MIT",
+    "scripts": {
+        "build": "tsc -p tsconfig.json --outDir build"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/RamAddict/bolsonaro-bot.git"
+    },
+    "bugs": {
+        "url": "https://github.com/RamAddict/bolsonaro-bot/issues"
+    },
+    "homepage": "https://github.com/RamAddict/bolsonaro-bot#readme",
+    "devDependencies": {
+        "@typescript-eslint/eslint-plugin": "^4.31.2",
+        "@typescript-eslint/parser": "^4.31.2",
+        "eslint": "^7.32.0",
+        "eslint-config-prettier": "^8.3.0",
+        "eslint-plugin-prettier": "^4.0.0",
+        "prettier": "^2.4.1",
+        "typescript": "^4.4.3"
+    },
+    "dependencies": {
+        "@discordjs/opus": "^0.6.0",
+        "discord.js": "^13.1.0",
+        "discord.js-commando": "^0.12.3",
+        "dotenv": "^10.0.0",
+        "ffmpeg-static": "^4.4.0"
+    }
+}
