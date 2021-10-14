@@ -3,6 +3,9 @@
     "version": "0.0.1",
     "description": "",
     "type": "module",
+    "engines": {
+        "node": ">=16"
+    },
     "main": "build/index.js",
     "license": "MIT",
     "scripts": {
@@ -21,6 +24,7 @@
     "homepage": "https://github.com/RamAddict/bolsonaro-bot#readme",
     "devDependencies": {
         "@types/pino": "^6.3.11",
+        "@types/semver": "^7.3.8",
         "@typescript-eslint/eslint-plugin": "^4.31.2",
         "@typescript-eslint/parser": "^4.31.2",
         "eslint": "^7.32.0",
@@ -30,7 +34,7 @@
         "nodemon": "^2.0.13",
         "prettier": "^2.4.1",
         "ts-node": "^10.2.1",
-        "typescript": "^4.4.3"
+        "typescript": "^4.4.4"
     },
     "dependencies": {
         "@discordjs/builders": "^0.6.0",

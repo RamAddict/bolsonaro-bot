@@ -3,6 +3,8 @@ import pino from "pino";
 import { Client } from "discord.js";
 import { DisTube } from "distube";
 import { playSong, skipSong, stopSong } from "./commands/music.js";
+import semver from "semver";
+// console.log(process.env)
 // Define Logger
 const logger = pino({
     prettyPrint: process.env.NODE_ENV !== "production",
@@ -35,28 +37,39 @@ client.on("interactionCreate", (interaction) => {
     // Get Command Data
     const { commandName } = interaction;
     // Switch Command
-    switch (commandName) {
-        case "play":
-            return playSong(
-                interaction,
-                distube,
-                logger.child({ command: "play" })
-            );
-        case "stop":
-            return stopSong(
-                interaction,
-                distube,
-                logger.child({ command: "stop" })
-            );
-        case "skip":
-            return skipSong(
-                interaction,
-                distube,
-                logger.child({ command: "skip" })
-            );
-        default:
-            return logger.warn(`Invalid command: ${commandName}`);
+    try {
+        switch (commandName) {
+            case "play":
+                return playSong(
+                    interaction,
+                    distube,
+                    logger.child({ command: "play" })
+                );
+            case "stop":
+                return stopSong(
+                    interaction,
+                    distube,
+                    logger.child({ command: "stop" })
+                );
+            case "skip":
+                return skipSong(
+                    interaction,
+                    distube,
+                    logger.child({ command: "skip" })
+                );
+            default:
+                return logger.warn(`Invalid command: ${commandName}`);
+        }
+    } catch (error) {
+        logger.error(error as Error);
     }
 });
 // Start Bot
-await client.login(process.env.DISCORD_TOKEN);
+try {
+    await client.login(process.env.DISCORD_TOKEN);
+} catch (error: any) {
+    // Log Message Error
+    logger.error(error.message);
+    // Exit from System
+    process.exit(1);
+}

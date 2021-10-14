@@ -1,8 +1,10 @@
 // Import Dependencies
 import { SlashCommandBuilder } from "@discordjs/builders";
-import { CommandInteraction, MessageEmbed } from "discord.js";
-import type { DisTube } from "distube";
+import { APIMessage } from "discord-api-types";
+import { CommandInteraction, Message, MessageEmbed } from "discord.js";
+import { DisTube, Playlist, Song } from "distube";
 import type { Logger } from "pino";
+import { URL } from "url";
 // Define Types
 // Register Commands Meta
 export const registry = [
@@ -22,6 +24,15 @@ export const registry = [
         .setName("skip")
         .setDescription("Skips the current music in queue"),
 ];
+// Define Helpers
+const isVideoUrl = (maybeUrl: string) => {
+    try {
+        new URL(maybeUrl);
+        return true;
+    } catch {
+        return false;
+    }
+};
 // Define Commands
 export const playSong = async (
     interaction: CommandInteraction,
@@ -33,43 +44,115 @@ export const playSong = async (
     // Get Song Name
     const songName = options.getString("song", true);
     // Get User Channel
-    const userChannel = guild?.members.cache.get(user.id)?.voice?.channel;
-    if (userChannel) {
-        // Search Song
-        const [searchResult] = await distube.search(songName, { limit: 1 });
-        if (searchResult) {
-            // Notify User
+    const guildMember = guild?.members.cache.get(user.id);
+    const userChannel = guildMember?.voice?.channel;
+    if (guild && guildMember && userChannel) {
+        // Notify Searching
+        await interaction.reply({
+            embeds: [
+                new MessageEmbed()
+                    .setTitle("Procurando Música")
+                    .setDescription(
+                        "Isso pode demorar, vou falar com o Paulo Guedes..."
+                    )
+                    .setThumbnail(
+                        "https://static.poder360.com.br/2017/09/bolsonaro_-868x644.jpg"
+                    ),
+            ],
+        });
+        // Check Url
+        if (isVideoUrl(songName)) {
             const alreadyPlaying = distube.getQueue(guild.id)?.playing;
-            await interaction.reply({
-                embeds: [
-                    new MessageEmbed()
-                        .setTitle(alreadyPlaying ? "Queued" : "Playing Now")
-                        .setDescription(searchResult.name)
-                        .setThumbnail(searchResult.thumbnail || "")
-                        .setURL(searchResult.url)
-                        .setFields(
-                            searchResult.uploader.name
-                                ? [
-                                      {
-                                          name: "Channel",
-                                          value: searchResult.uploader.name,
-                                          inline: true,
-                                      },
-                                  ]
-                                : []
-                        ),
-                ],
-            });
             // Play Song
-            logger.info(`[GUID: %d] Playing %s`, guild.id, searchResult.name);
-            await distube.playVoiceChannel(userChannel, searchResult.url, {
-                skip: false,
-            });
+            const songOrPlaylist = await distube.handler.resolveSong(
+                guildMember,
+                songName
+            );
+            if (songOrPlaylist) {
+                const firstSong: Song = Object.prototype.hasOwnProperty.call(
+                    songOrPlaylist,
+                    "songs"
+                )
+                    ? (songOrPlaylist as Playlist).songs[0]
+                    : (songOrPlaylist as Song);
+
+                logger.info(
+                    `[GUID: %d] Playing video %s`,
+                    guild.id,
+                    songOrPlaylist.name
+                );
+                await interaction.editReply({
+                    embeds: [
+                        new MessageEmbed()
+                            .setTitle(alreadyPlaying ? "Queued" : "Playing Now")
+                            .setDescription(firstSong.name || "<Invalid Name>")
+                            .setThumbnail(
+                                firstSong.thumbnail || "<Invalid Thumnail>"
+                            )
+                            .setURL(songOrPlaylist.url || firstSong.url)
+                            .setFields(
+                                firstSong.uploader.name
+                                    ? [
+                                          {
+                                              name: "Channel",
+                                              value: firstSong.uploader.name,
+                                              inline: true,
+                                          },
+                                      ]
+                                    : []
+                            ),
+                    ],
+                });
+                await distube.playVoiceChannel(userChannel, songOrPlaylist, {
+                    skip: false,
+                });
+            } else {
+                // Alert User
+                await interaction.editReply({
+                    content: "Could not find any content related to this",
+                });
+            }
         } else {
-            // Alert User
-            await interaction.reply({
-                content: "Could not find any content related to this",
-            });
+            // Search Song
+            const [searchResult] = await distube.search(songName, { limit: 1 });
+            if (searchResult) {
+                // Notify User
+                const alreadyPlaying = distube.getQueue(guild.id)?.playing;
+                await interaction.editReply({
+                    embeds: [
+                        new MessageEmbed()
+                            .setTitle(alreadyPlaying ? "Queued" : "Playing Now")
+                            .setDescription(searchResult.name)
+                            .setThumbnail(searchResult.thumbnail || "")
+                            .setURL(searchResult.url)
+                            .setFields(
+                                searchResult.uploader.name
+                                    ? [
+                                          {
+                                              name: "Channel",
+                                              value: searchResult.uploader.name,
+                                              inline: true,
+                                          },
+                                      ]
+                                    : []
+                            ),
+                    ],
+                });
+                // Play Song
+                logger.info(
+                    `[GUID: %d] Playing %s`,
+                    guild.id,
+                    searchResult.name
+                );
+                await distube.playVoiceChannel(userChannel, searchResult.url, {
+                    skip: false,
+                });
+            } else {
+                // Alert User
+                await interaction.editReply({
+                    content: "Could not find any content related to this",
+                });
+            }
         }
     } else {
         // Alert Not In Channel
